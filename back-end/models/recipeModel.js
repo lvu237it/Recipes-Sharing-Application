@@ -28,6 +28,12 @@ const recipeSchema = new mongoose.Schema({
       'món cháo',
       'món ăn vặt',
       'món cuốn',
+      'món dịp đặc biệt',
+      'món giò',
+      'món khai vị',
+      'món salad',
+      'món hầm',
+      'món súp',
     ],
     required: [true, 'A post needs a category!'],
   },
@@ -63,15 +69,9 @@ const recipeSchema = new mongoose.Schema({
     ref: 'User', //Tham chiếu tới collection User
     required: true,
   },
-  // comments: [
-  //   {
-  //     user: {
-  //       type: mongoose.SchemaTypes.ObjectId,
-  //       ref: 'User', //Tham chiếu tới collection User
-  //     },
-  //     commentDescription: String,
-  //   },
-  // ],
+  sources: {
+    type: [String],
+  },
   createdAt: {
     type: Date,
     default: Date.now(),

@@ -15,7 +15,7 @@ const recipeRouter = require('./routes/recipeRoutes');
 
 //các middleware phục vụ cho việc develop
 app.use(morgan('dev'));
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 //routing handlers
