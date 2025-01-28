@@ -2,11 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, Image, View, StyleSheet, FlatList, Text } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
-import {
-  CLOUDINARY_NAME,
-  CLOUDINARY_API_KEY,
-  CLOUDINARY_API_SECRET_KEY,
-} from '@env';
+import * as FileSystem from 'expo-file-system';
 
 export default function App() {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -21,6 +17,12 @@ export default function App() {
       .catch((error) => console.error('Error fetching recipes:', error));
 
     console.log('selectedImage', selectedImage);
+  }, [selectedImage]);
+
+  useEffect(() => {
+    console.log('selectedImage', selectedImage);
+    console.log('selectedImage typeof', typeof selectedImage);
+    console.log('process.env.expo', process.env.EXPO_PUBLIC_CLOUDINARY_NAME);
   }, [selectedImage]);
 
   const handleSelectImage = async () => {
@@ -61,7 +63,38 @@ export default function App() {
     }
   };
 
-  const handlePostRecipeRequest = () => {
+  const uploadImageToCloudinary = async (fileUri) => {
+    try {
+      // Đọc file từ đường dẫn URI
+      const fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Tạo form data với file đã chuyển đổi
+      const formData = new FormData();
+      formData.append('file', `data:image/jpeg;base64,${fileBase64}`);
+      formData.append(
+        'upload_preset',
+        'mma301-recipes-sharing-app-single-image-for-recipe'
+      );
+
+      const response = await axios.post(
+        `https://api.cloudinary.com/v1_1/${process.env.EXPO_PUBLIC_CLOUDINARY_NAME}/image/upload`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return response.data.secure_url; // Trả về URL ảnh đã upload
+    } catch (error) {
+      console.error('Error uploading to Cloudinary:', error);
+    }
+  };
+
+  const handlePostRecipeRequest = async () => {
     const formData = new FormData();
     formData.append('foodCategories', JSON.stringify(['món nộm']));
     formData.append('title', 'test');
@@ -69,37 +102,62 @@ export default function App() {
     formData.append('ingredients', JSON.stringify(['test']));
     formData.append(
       'steps',
-      JSON.stringify([
-        {
-          stepNumber: 1,
-          description: 'test',
-        },
-      ])
+      JSON.stringify([{ stepNumber: 1, description: 'test' }])
     );
     formData.append('owner', '679340974e7de09465f4c743');
     formData.append('sources', JSON.stringify(['test']));
-    if (selectedImage) {
-      formData.append('imageFile', {
-        uri: selectedImage,
-        name: 'my-screen.jpg',
-        type: 'image/jpeg',
-      });
-    }
 
-    axios
-      .post('http://10.0.2.2:3000/recipes/create-new-recipe', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      .then((response) => {
+    let resultUploadImageToCloudinary;
+    if (selectedImage) {
+      try {
+        // Upload ảnh trực tiếp lên Cloudinary
+        resultUploadImageToCloudinary = await uploadImageToCloudinary(
+          selectedImage
+        );
+        if (resultUploadImageToCloudinary.length > 0) {
+          console.log('Upload image to cloudinary successfully!');
+
+          formData.append('imageUrl', resultUploadImageToCloudinary); // Đính kèm URL ảnh đã upload
+
+          // Tiến hành gửi yêu cầu POST đến backend với ảnh đã upload
+          const response = await axios.post(
+            'http://10.0.2.2:3000/recipes/create-new-recipe',
+            formData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          if (response.status === 200) {
+            console.log('Create recipe post successfully!');
+          } else {
+            console.log('Create recipe post failed!');
+          }
+        }
+      } catch (error) {
+        console.error('Error uploading image to Cloudinary:', error);
+      }
+    } else {
+      try {
+        // Tiến hành gửi yêu cầu POST đến backend với ảnh đã upload
+        const response = await axios.post(
+          'http://10.0.2.2:3000/recipes/create-new-recipe',
+          formData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
         if (response.status === 200) {
           console.log('Create recipe post successfully!');
-        } else {
-          console.log('Create recipe post failed!');
         }
-      })
-      .catch((error) => console.error('Error posting data:', error));
+      } catch (error) {
+        console.log('Create recipe post failed!', error);
+      }
+    }
   };
 
   const Recipe = ({ recipe }) => (
